@@ -41,6 +41,11 @@ section[data-testid="stSidebar"] {
     background: #1b1636;
     border-right: 1px solid #9d4edd;
 }
+/* Sidebar Labels Visible */
+section[data-testid="stSidebar"] label {
+    color: white !important;
+    font-weight: 600 !important;
+}
 
 /* Titles */
 h1, h2, h3 {
