@@ -144,13 +144,13 @@ hr {
 # =========================
 
 firebase_config = {
-    "apiKey": "AIzaSyCrl8_evCgak3qkv1h70xZeJ0KHwaeL0M4",
-    "authDomain": "ai-creator-assistant-e6fd3.firebaseapp.com",
-    "projectId": "ai-creator-assistant-e6fd3",
-    "storageBucket": "ai-creator-assistant-e6fd3.firebasestorage.app",
-    "messagingSenderId": "1057319714793",
-    "appId": "1:1057319714793:web:4652f887562e29124bd578",
-    "measurementId": "G-NRC9MQY785",
+    "apiKey": os.getenv("FIREBASE_API_KEY"),
+    "authDomain": os.getenv("FIREBASE_AUTH_DOMAIN"),
+    "projectId": os.getenv("FIREBASE_PROJECT_ID"),
+    "storageBucket": os.getenv("FIREBASE_STORAGE_BUCKET"),
+    "messagingSenderId": os.getenv("FIREBASE_MESSAGING_SENDER_ID"),
+    "appId": os.getenv("FIREBASE_APP_ID"),
+    "measurementId": os.getenv("FIREBASE_MEASUREMENT_ID"),
     "databaseURL": ""
 }
 
