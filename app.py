@@ -4,24 +4,23 @@ from dotenv import load_dotenv
 from PIL import Image
 from io import BytesIO
 import requests
+import pyrebase
 import os
 
-# Load environment variables
-load_dotenv()
+# =========================
+# PAGE CONFIG
+# =========================
 
-# Gemini Text Client
-text_client = genai.Client(
-    api_key=os.getenv("GEMINI_TEXT_API_KEY")
-)
-
-# Streamlit Page Config
 st.set_page_config(
     page_title="AI Creator Assistant",
     page_icon="🎬",
     layout="wide"
 )
 
-# Purple Theme UI
+# =========================
+# CUSTOM CSS
+# =========================
+
 st.markdown("""
 <style>
 
@@ -41,7 +40,8 @@ section[data-testid="stSidebar"] {
     background: #1b1636;
     border-right: 1px solid #9d4edd;
 }
-/* Sidebar Labels Visible */
+
+/* Sidebar Labels */
 section[data-testid="stSidebar"] label {
     color: white !important;
     font-weight: 600 !important;
@@ -59,39 +59,29 @@ h1, h2, h3 {
         90deg,
         #7b2cbf,
         #9d4edd
-    );
-    color: white;
-    border: none;
-    border-radius: 12px;
-    height: 50px;
-    width: 100%;
-    font-size: 18px;
-    font-weight: bold;
+    ) !important;
+
+    color: white !important;
+    border: none !important;
+    border-radius: 12px !important;
+    height: 50px !important;
+    width: 100% !important;
+    font-size: 18px !important;
+    font-weight: bold !important;
 }
 
-.stButton > button:hover {
-    background: linear-gradient(
-        90deg,
-        #9d4edd,
-        #c77dff
-    );
-}
-
-/* Download Buttons */
-.stDownloadButton > button {
-    background: #7b2cbf;
-    color: white;
-    border-radius: 10px;
-    border: none;
-}
-
-/* Input Fields */
+/* Inputs */
 .stTextInput input,
 .stSelectbox div[data-baseweb="select"] {
-    background-color: #2d2d5a;
-    color: white;
-    border-radius: 10px;
-    border: 1px solid #9d4edd;
+    background-color: #2d2d5a !important;
+    color: white !important;
+    border-radius: 10px !important;
+    border: 1px solid #9d4edd !important;
+}
+
+/* Placeholder */
+input::placeholder {
+    color: #cccccc !important;
 }
 
 /* Text Area */
@@ -100,7 +90,7 @@ textarea {
     color: white !important;
 }
 
-/* Metrics */
+/* Metric Containers */
 [data-testid="metric-container"] {
     background: rgba(255,255,255,0.05);
     border: 1px solid #9d4edd;
@@ -108,15 +98,25 @@ textarea {
     border-radius: 15px;
 }
 
-/* Tabs */
-.stTabs [data-baseweb="tab"] {
-    color: white;
-    font-size: 16px;
+/* ALL metric text */
+[data-testid="metric-container"] * {
+    color: white !important;
 }
 
-.stTabs [aria-selected="true"] {
-    background-color: #7b2cbf;
-    border-radius: 10px;
+/* Metric labels */
+[data-testid="metric-container"] label,
+[data-testid="metric-container"] p,
+[data-testid="metric-container"] div {
+    color: #ffffff !important;
+    font-size: 18px !important;
+    font-weight: 700 !important;
+}
+
+/* Metric numbers */
+[data-testid="stMetricValue"] {
+    color: white !important;
+    font-size: 42px !important;
+    font-weight: bold !important;
 }
 
 /* Images */
@@ -125,239 +125,476 @@ img {
     border: 2px solid #9d4edd;
 }
 
+/* Tabs */
+.stTabs [data-baseweb="tab"] {
+    color: white !important;
+    font-size: 18px;
+}
+
+/* Footer */
+hr {
+    border: 1px solid #9d4edd;
+}
+
 </style>
 """, unsafe_allow_html=True)
 
-# Title
-st.title("🎬 AI Creator Assistant")
-st.write("Generate viral short-form video,images,reels scripts and AI thumbnails using AI")
+# =========================
+# FIREBASE CONFIG
+# =========================
 
-# Metrics
-m1, m2, m3 = st.columns(3)
+firebase_config = {
+    "apiKey": "AIzaSyCrl8_evCgak3qkv1h70xZeJ0KHwaeL0M4",
+    "authDomain": "ai-creator-assistant-e6fd3.firebaseapp.com",
+    "projectId": "ai-creator-assistant-e6fd3",
+    "storageBucket": "ai-creator-assistant-e6fd3.firebasestorage.app",
+    "messagingSenderId": "1057319714793",
+    "appId": "1:1057319714793:web:4652f887562e29124bd578",
+    "measurementId": "G-NRC9MQY785",
+    "databaseURL": ""
+}
 
-m1.metric("Scripts Generated", "100+")
-m2.metric("AI Thumbnails", "300+")
-m3.metric("Platforms Supported", "3")
+firebase = pyrebase.initialize_app(firebase_config)
+auth = firebase.auth()
 
-# Sidebar
-st.sidebar.header("⚙️ Content Settings")
+# =========================
+# LOAD ENV
+# =========================
 
-topic = st.sidebar.text_input(
-    "Enter Video Topic",
-    placeholder="Example: AI replacing jobs"
+load_dotenv()
+
+# =========================
+# GEMINI CLIENT
+# =========================
+
+text_client = genai.Client(
+    api_key=os.getenv("GEMINI_TEXT_API_KEY")
 )
 
-niche = st.sidebar.selectbox(
-    "Select Niche",
-    [
-        "Technology",
-        "Finance",
-        "Fitness",
-        "Gaming",
-        "Education",
-        "Motivation",
-        "Travel",
-        "Fashion",
-        "Food"
-    ]
-)
+# =========================
+# LOGIN / SIGNUP
+# =========================
 
-platform = st.sidebar.selectbox(
-    "Select Platform",
-    [
-        "YouTube Shorts",
-        "Instagram Reels",
-        "TikTok"
-    ]
-)
+if 'user' not in st.session_state:
 
-content_style = st.sidebar.selectbox(
-    "Content Style",
-    [
-        "Professional",
-        "Funny",
-        "Motivational",
-        "Storytelling",
-        "Emotional",
-        "Educational"
-    ]
-)
+    st.title("🔐 AI Creator Authentication")
 
-duration = st.sidebar.selectbox(
-    "Video Duration",
-    [
-        "30 Seconds",
-        "60 Seconds",
-        "90 Seconds"
-    ]
-)
-
-# Generate Button
-generate_btn = st.button("🚀 Generate Content")
-
-# Text Generation Function
-def generate_script(topic, niche, platform, style, duration):
-
-    prompt = f"""
-    You are a professional viral content creator.
-
-    Generate a high-engagement short-form video script.
-
-    Topic: {topic}
-    Niche: {niche}
-    Platform: {platform}
-    Content Style: {style}
-    Duration: {duration}
-
-    Generate:
-    1. Video Title
-    2. Hook
-    3. Short-form Script
-    4. Scene Structure
-    5. CTA
-    6. Hashtags
-    """
-
-    response = text_client.models.generate_content(
-        model="gemini-2.5-flash-lite",
-        contents=prompt
+    choice = st.selectbox(
+        "Login/Signup",
+        ["Login", "Sign Up"]
     )
 
-    return response.text
+    email = st.text_input("Email")
 
-# Thumbnail Generation Function
-def generate_thumbnails(prompt, count=3):
+    password = st.text_input(
+        "Password",
+        type="password"
+    )
 
-    url = "https://imageapi.juideepadas1234.workers.dev"
+    # =========================
+    # SIGNUP
+    # =========================
 
-    headers = {
-        "Authorization": "Bearer 12345678",
-        "Content-Type": "application/json"
-    }
+    if choice == "Sign Up":
 
-    images = []
+        username = st.text_input("Username")
 
-    for i in range(count):
+        if st.button("Create Account"):
 
-        data = {
-            "prompt": prompt + f" variation {i+1}"
-        }
+            try:
 
-        response = requests.post(
-            url,
-            headers=headers,
-            json=data
+                auth.create_user_with_email_and_password(
+                    email,
+                    password
+                )
+
+                st.success(
+                    "Account Created Successfully"
+                )
+
+                st.info(
+                    "Now login using your email and password"
+                )
+
+            except Exception:
+
+                st.error(
+                    "Email already exists or password too weak"
+                )
+
+    # =========================
+    # LOGIN
+    # =========================
+
+    if choice == "Login":
+
+        if st.button("Login"):
+
+            try:
+
+                user = auth.sign_in_with_email_and_password(
+                    email,
+                    password
+                )
+
+                st.session_state['user'] = email
+
+                st.success("Login Successful")
+
+                st.rerun()
+
+            except Exception:
+
+                st.error(
+                    "Invalid Email or Password"
+                )
+
+# =========================
+# MAIN APP
+# =========================
+
+else:
+
+    # =========================
+    # SIDEBAR
+    # =========================
+
+    st.sidebar.success(
+        f"Logged in as\n\n{st.session_state['user']}"
+    )
+
+    if st.sidebar.button("Logout"):
+
+        del st.session_state['user']
+
+        st.rerun()
+
+    # =========================
+    # TITLE
+    # =========================
+
+    st.title("🎬 AI Creator Assistant")
+
+    st.write(
+        "Generate viral short-form videos, reels scripts and AI thumbnails using AI"
+    )
+
+    # =========================
+    # METRICS
+    # =========================
+
+    col1, col2, col3 = st.columns(3)
+
+    with col1:
+        st.metric(
+            "Scripts Generated",
+            "100+"
         )
 
-        if response.status_code == 200:
+    with col2:
+        st.metric(
+            "AI Thumbnails",
+            "300+"
+        )
 
-            image = Image.open(
-                BytesIO(response.content)
-            )
+    with col3:
+        st.metric(
+            "Platforms Supported",
+            "3"
+        )
 
-            images.append(image)
+    # =========================
+    # SIDEBAR SETTINGS
+    # =========================
 
-    return images
+    st.sidebar.header("⚙️ Content Settings")
 
-# Main Logic
-if generate_btn:
+    topic = st.sidebar.text_input(
+        "Enter Video Topic",
+        placeholder="Example: AI replacing jobs"
+    )
 
-    if topic.strip() == "":
-        st.warning("Please enter a topic")
+    niche = st.sidebar.selectbox(
+        "Select Niche",
+        [
+            "Technology",
+            "Finance",
+            "Fitness",
+            "Gaming",
+            "Education",
+            "Motivation",
+            "Travel",
+            "Fashion",
+            "Food"
+        ]
+    )
 
-    else:
+    platform = st.sidebar.selectbox(
+        "Select Platform",
+        [
+            "YouTube Shorts",
+            "Instagram Reels",
+            "TikTok"
+        ]
+    )
 
-        # Generate Script
-        with st.spinner("Generating AI Script..."):
+    content_style = st.sidebar.selectbox(
+        "Content Style",
+        [
+            "Professional",
+            "Funny",
+            "Motivational",
+            "Storytelling",
+            "Emotional",
+            "Educational"
+        ]
+    )
 
-            generated_script = generate_script(
-                topic,
-                niche,
-                platform,
-                content_style,
-                duration
-            )
+    duration = st.sidebar.selectbox(
+        "Video Duration",
+        [
+            "30 Seconds",
+            "60 Seconds",
+            "90 Seconds"
+        ]
+    )
 
-        # Thumbnail Prompt
-        thumbnail_prompt = f"""
-        Create a viral cinematic thumbnail.
+    # =========================
+    # GENERATE BUTTON
+    # =========================
+
+    generate_btn = st.button(
+        "🚀 Generate Content"
+    )
+
+    # =========================
+    # SCRIPT FUNCTION
+    # =========================
+
+    def generate_script(
+        topic,
+        niche,
+        platform,
+        style,
+        duration
+    ):
+
+        prompt = f"""
+        You are a professional viral content creator.
+
+        Generate a high-engagement short-form video script.
 
         Topic: {topic}
         Niche: {niche}
-        Style: {content_style}
+        Platform: {platform}
+        Style: {style}
+        Duration: {duration}
 
-        Ultra realistic,
-        highly engaging,
-        social media optimized,
-        neon lighting,
-        trendy aesthetic,
-        clickworthy YouTube thumbnail
+        Generate:
+        1. Video Title
+        2. Hook
+        3. Short-form Script
+        4. Scene Structure
+        5. CTA
+        6. Hashtags
         """
 
-        # Generate 3 Thumbnails
-        with st.spinner("Generating AI Thumbnails..."):
-
-            thumbnails = generate_thumbnails(
-                thumbnail_prompt,
-                count=3
-            )
-
-        # Tabs
-        tab1, tab2 = st.tabs(
-            ["📜 AI Script", "🖼️ AI Thumbnails"]
+        response = text_client.models.generate_content(
+            model="gemini-2.5-flash",
+            contents=prompt
         )
 
-        # Script Tab
-        with tab1:
+        return response.text
 
-            st.subheader("📜 AI Generated Script")
+    # =========================
+    # THUMBNAIL FUNCTION
+    # =========================
 
-            st.text_area(
-                "Generated Content",
-                generated_script,
-                height=600
+    def generate_thumbnails(prompt, count=3):
+
+        url = "https://imageapi.juideepadas1234.workers.dev"
+
+        headers = {
+            "Authorization": "Bearer 12345678",
+            "Content-Type": "application/json"
+        }
+
+        images = []
+
+        for i in range(count):
+
+            data = {
+                "prompt": prompt + f" variation {i+1}"
+            }
+
+            response = requests.post(
+                url,
+                headers=headers,
+                json=data
             )
 
-            st.download_button(
-                label="📥 Download Script",
-                data=generated_script,
-                file_name="ai_script.txt",
-                mime="text/plain"
+            if response.status_code == 200:
+
+                image = Image.open(
+                    BytesIO(response.content)
+                )
+
+                images.append(image)
+
+        return images
+
+    # =========================
+    # GENERATE CONTENT
+    # =========================
+
+    if generate_btn:
+
+        if topic.strip() == "":
+
+            st.warning(
+                "Please enter a topic"
             )
 
-            with st.expander("See Thumbnail Prompt"):
+        else:
 
-                st.write(thumbnail_prompt)
+            # =========================
+            # GENERATE SCRIPT
+            # =========================
 
-        # Thumbnail Tab
-        with tab2:
+            with st.spinner(
+                "Generating AI Script..."
+            ):
 
-            st.subheader("🖼️ AI Generated Thumbnails")
+                generated_script = generate_script(
+                    topic,
+                    niche,
+                    platform,
+                    content_style,
+                    duration
+                )
 
-            cols = st.columns(3)
+            # =========================
+            # THUMBNAIL PROMPT
+            # =========================
 
-            for idx, image in enumerate(thumbnails):
+            thumbnail_prompt = f"""
+            Create a viral cinematic thumbnail.
 
-                with cols[idx]:
+            Topic: {topic}
+            Niche: {niche}
+            Style: {content_style}
 
-                    st.image(
-                        image,
-                        use_container_width=True
-                    )
+            Ultra realistic,
+            social media optimized,
+            futuristic,
+            neon lighting,
+            highly engaging,
+            clickworthy thumbnail
+            """
 
-                    image_path = f"thumbnail_{idx+1}.png"
+            # =========================
+            # GENERATE THUMBNAILS
+            # =========================
 
-                    image.save(image_path)
+            with st.spinner(
+                "Generating AI Thumbnails..."
+            ):
 
-                    with open(image_path, "rb") as file:
+                thumbnails = generate_thumbnails(
+                    thumbnail_prompt,
+                    count=3
+                )
 
-                        st.download_button(
-                            label=f"📥 Download {idx+1}",
-                            data=file,
-                            file_name=image_path,
-                            mime="image/png"
+            # =========================
+            # TABS
+            # =========================
+
+            tab1, tab2 = st.tabs(
+                [
+                    "📜 AI Script",
+                    "🖼️ AI Thumbnails"
+                ]
+            )
+
+            # =========================
+            # SCRIPT TAB
+            # =========================
+
+            with tab1:
+
+                st.subheader(
+                    "📜 AI Generated Script"
+                )
+
+                st.text_area(
+                    "Generated Content",
+                    generated_script,
+                    height=600
+                )
+
+                st.download_button(
+                    label="📥 Download Script",
+                    data=generated_script,
+                    file_name="ai_script.txt",
+                    mime="text/plain"
+                )
+
+            # =========================
+            # THUMBNAILS TAB
+            # =========================
+
+            with tab2:
+
+                st.subheader(
+                    "🖼️ AI Generated Thumbnails"
+                )
+
+                cols = st.columns(3)
+
+                for idx, image in enumerate(
+                    thumbnails
+                ):
+
+                    with cols[idx]:
+
+                        st.image(
+                            image,
+                            use_container_width=True
                         )
 
-# Footer
-st.markdown("---")
+                        image_path = (
+                            f"thumbnail_{idx+1}.png"
+                        )
 
+                        image.save(image_path)
+
+                        with open(
+                            image_path,
+                            "rb"
+                        ) as file:
+
+                            st.download_button(
+                                label=f"📥 Download {idx+1}",
+                                data=file,
+                                file_name=image_path,
+                                mime="image/png"
+                            )
+
+    # =========================
+    # FOOTER
+    # =========================
+
+    st.markdown("---")
+
+    st.markdown("""
+    ### ✨ Features
+
+    - Firebase Authentication
+    - AI Script Generation
+    - AI Thumbnail Generation
+    - 3 Thumbnail Variations
+    - Viral Hooks
+    - CTA Creation
+    - Scene Planning
+    - Purple Futuristic UI
+    """)
