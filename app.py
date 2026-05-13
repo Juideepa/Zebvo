@@ -586,15 +586,4 @@ else:
 
     st.markdown("---")
 
-    st.markdown("""
-    ### ✨ Features
 
-    - Firebase Authentication
-    - AI Script Generation
-    - AI Thumbnail Generation
-    - 3 Thumbnail Variations
-    - Viral Hooks
-    - CTA Creation
-    - Scene Planning
-    - Purple Futuristic UI
-    """)
